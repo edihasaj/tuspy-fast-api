@@ -1,5 +1,5 @@
 fastapi~=0.110.0
-setuptools~=65.6.3
+setuptools~=70.0.0
 anyio==4.3.0
 exceptiongroup==1.2.0
 click==8.1.7
