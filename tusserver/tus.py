@@ -1,4 +1,5 @@
 import base64
+import inspect
 import json
 import os
 from datetime import datetime, timedelta
@@ -20,7 +21,7 @@ from starlette.responses import FileResponse
 from tusserver.metadata import FileMetadata
 
 
-def default_auth():
+async def default_auth():
     pass
 
 
@@ -35,7 +36,7 @@ def create_api_router(
 ):
     if prefix and prefix[0] == "/":
         prefix = prefix[1:]
-    router = APIRouter(prefix=f"/{prefix}")
+    router = APIRouter(prefix=f"/{prefix}", redirect_slashes=True)
 
     tus_version = "1.0.0"
     tus_extension = (
@@ -107,7 +108,7 @@ def create_api_router(
         return response
 
     @router.patch("/{uuid}", status_code=status.HTTP_204_NO_CONTENT)
-    def upload_chunk(
+    async def upload_chunk(
         response: Response,
         uuid: str,
         content_length: int = Header(None),
@@ -126,7 +127,10 @@ def create_api_router(
         meta = _read_metadata(uuid)
         if meta and meta.size == meta.offset:
             file_path = os.path.join(files_dir, uuid)
-            on_complete(file_path, meta.metadata)
+            result = on_complete(file_path, meta.metadata)
+            # if the callback returned a coroutine, await it
+            if inspect.isawaitable(result):
+                await result
 
         return headers
 
@@ -140,6 +144,7 @@ def create_api_router(
         response.status_code = status.HTTP_204_NO_CONTENT
         return response
 
+    @router.post("", status_code=status.HTTP_201_CREATED)
     @router.post("/", status_code=status.HTTP_201_CREATED)
     async def create_upload(
         request: Request,
@@ -186,7 +191,10 @@ def create_api_router(
         meta = _read_metadata(uuid)
         if meta and meta.size == 0:
             file_path = os.path.join(files_dir, uuid)
-            on_complete(file_path, meta.metadata)
+            result = on_complete(file_path, meta.metadata)
+            # if the callback returned a coroutine, await it
+            if inspect.isawaitable(result):
+                await result
 
         return response
 
